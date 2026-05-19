@@ -92,8 +92,7 @@ def load_data():
 
 df = load_data()
 if df is None:
-    st.warning("Arquivo de dados não encontrado ou inválido.")
-    st.info("Coloque o arquivo 'Chamados fevereiro abertos.xls' ou 'Chamados fevereiro abertos.xls - chamadosDT.csv' na raiz deste projeto.")
+    st.warning("Arquivo de dados não encontrado ou inválido.")  
     st.stop()
 
 try:
@@ -178,6 +177,13 @@ try:
 
     # exibir apenas os chamados com status 'A. AQUISIÇÃO' e com as colunas definidas
     df_aquisicao = df_filtrado[df_filtrado['Status'].str.lower() == 'a. aquisição'][colunas_visao].sort_values(by='Dias em Aberto', ascending=False)
+    st.dataframe(df_aquisicao, use_container_width=True, hide_index=True)
+    st.markdown("---")
+
+    # exibir a tabela de chamados em atendimento
+    st.subheader("⚡ Chamados em Atendimento")
+    colunas_visao = ['Nº', 'Dias em Aberto', 'Objeto', 'OM', 'Solicitante', 'Status', 'Descrição do Problema']
+    # exibir apenas os chamados com status 'ATEatus'].str.lower() == 'a. aquisição'][colunas_visao].sort_values(by='Dias em Aberto', ascending=False)
     st.dataframe(df_aquisicao, use_container_width=True, hide_index=True)
     st.markdown("---")
 
