@@ -4,7 +4,7 @@ import streamlit as st
 # config global
 st.set_page_config(
     page_title="Sistema de Apoio ao SAU",
-    layout="wide"
+    page_icon="✈️",
 )
 
 # declaração e mapeamento de página
