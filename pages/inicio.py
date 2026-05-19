@@ -20,7 +20,7 @@ Esta ferramenta foi desenvolvida para otimizar o fluxo de gerenciamento de Orden
 # CRIAR UM UPLOADER DE ARQUIVOS
 
 # criar o file uploader para arquivos .xlsx ou .csv
-uploaded_file = st.file_uploader("Carregar arquivo de dados (.xlsx ou .csv)", type=["xls"])
+uploaded_file = st.file_uploader("Carregar arquivo de dados (.xlsx ou .csv)", type=["xls", "xlsx", "csv"])
 
 if uploaded_file is not None:
     # garantir que o processamento ocorra apenas uma vez por arquivo carregado
@@ -33,7 +33,7 @@ if uploaded_file is not None:
             sleep(2)  # Simula um tempo de processamento
         st.session_state["file_processed"] = True
 
-    if uploaded_file.name.endswith('.csv') or uploaded_file.name.endswith('.xls'):
+    if uploaded_file.name.endswith('.csv') or uploaded_file.name.endswith('.xls') or uploaded_file.name.endswith('.xlsx'):
         st.success("Arquivo carregado com sucesso!")
         if st.button("Iniciar Sistema", type="secondary"):
             # salvar o arquivo na pasta data
@@ -45,7 +45,7 @@ if uploaded_file is not None:
             st.switch_page("pages/painel_gerencial.py")
             
     else:
-        st.error("Formato de arquivo inválido. Por favor, carregue um arquivo .xlsx ou .csv.")
+        st.error("Formato de arquivo inválido. Por favor, carregue um arquivo .xlsx, .xls ou .csv.")
         st.stop()
 
     
