@@ -95,10 +95,14 @@ if df is None:
     st.warning("Arquivo de dados não encontrado ou inválido.")  
     st.stop()
 
+    # voltar para a página inicial caso o arquivo não seja encontrado ou seja inválido
+    st.switch_page("pages/inicio.py")
+
 try:
     st.sidebar.title("⚙️ Filtros do Sistema")
     st.sidebar.header("Menu")
-    st.sidebar.caption("Use os filtros abaixo para refinar os dados exibidos no painel. Você pode selecionar uma ou mais opções em cada categoria, e ajustar o intervalo de dias em aberto para focar nos chamados mais críticos.")
+    st.sidebar.caption("Use os filtros abaixo para refinar os dados exibidos no painel. Você pode selecionar uma ou mais opções em cada categoria, e ajustar o intervalo de dias em aberto para focar nos chamados mais críticos")
+    st.sidebar.caption("🔧 OBS: desenvolvido e mantido por SGT Link, em fases de testes...")
     
     # Preparar opções para filtros
     lista_objetos = sorted(df['Objeto'].dropna().unique().tolist())
@@ -203,3 +207,5 @@ try:
 except Exception as e:
     st.error(f"Erro ao processar o arquivo de chamados: {e}")
     st.info("Verifique o formato do arquivo e os nomes das colunas esperadas (ex.: 'Ab.', 'Objeto', 'OM', 'Solicitante', 'Solucionador').")
+    st.stop()
+    st.switch_page("pages/inicio.py")
