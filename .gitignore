@@ -1,6 +1,3 @@
-# Project data
-data/
-
 # Environment files
 .env
 .env.*
