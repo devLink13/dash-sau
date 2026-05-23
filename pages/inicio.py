@@ -7,6 +7,15 @@ st.set_page_config(
     layout='centered'
 )
 
+# verificando se o militar está logado e dando boas vindas
+if 'logado' not in st.session_state:
+    st.session_state['logado'] = False
+    st.switch_page("pages/login.py")
+elif st.session_state.logado:
+    dados_militar = st.session_state.dados_militar
+    st.sidebar.markdown(f"### 👤 {dados_militar['nome']}")
+    st.toast(f'Bem-vindo, Sr. {dados_militar['posto']}{dados_militar['nome']}!')
+
 st.title("✈️ Bem-vindo ao Sistema de Apoio ao SAU da BACG 🛠️")
 st.markdown("""
 Esta ferramenta foi desenvolvida para otimizar o fluxo de gerenciamento de Ordens de Serviço do EIE da BACG.

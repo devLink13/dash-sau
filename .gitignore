@@ -14,3 +14,11 @@ env/
 # Editor / OS files
 .vscode/
 .DS_Store
+
+# .streamlit
+.streamlit/
+
+# data
+data/
+.data/
+data
