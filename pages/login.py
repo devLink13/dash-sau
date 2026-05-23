@@ -33,7 +33,7 @@ def validar_login(saram, password):
         return False
 
 
-def validar_cadastro(name, email, password, confirm_password, saram, confirm_saram, funcao, confirm_funcao, posto_graduacao, secao):
+def validar_cadastro(name, email, password, confirm_password, saram, confirm_saram, funcao, confirm_funcao, posto_graduacao, secao, nome_guerra):
     ## vericações básicas de cadastro, como campos preenchidos e correspondência de senha/SARAM
     if not all([name, email, password, confirm_password, saram, confirm_saram, funcao, confirm_funcao, posto_graduacao]): # Verificação de campos vazios
         st.error("Por favor, preencha todos os campos.")
@@ -56,7 +56,8 @@ def validar_cadastro(name, email, password, confirm_password, saram, confirm_sar
             "senha_hash": hash_password(password=password), # Armazena a senha como hash para segurança
             "funcao": funcao,
             "posto": posto_graduacao,
-            "secao": secao
+            "secao": secao,
+            "nome_guerra": nome_guerra
         }
 
         #gravar os dados no banco de dados (tabela "usuarios")
@@ -148,11 +149,13 @@ if not st.session_state.logado: # Se o usuário não estiver logado, exibe a ár
             columns = st.columns(2)
             with columns[0]:
                 username_cadastro = st.text_input("Nome Completo", placeholder="Digite seu nome completo")
-                password_cadastro = st.text_input("Senha", type="password", placeholder="Digite sua senha")
-                saram_cadastro = st.text_input("SARAM", placeholder="Digite seu SARAM, sem espaços ou traços")
-            with columns[1]:
+                warname_cadastro = st.text_input("Nome de Guerra", placeholder="Digite seu nome de guerra")
                 email_cadastro = st.text_input("Email", placeholder="Digite seu email")
+                
+            with columns[1]:
+                password_cadastro = st.text_input("Senha", type="password", placeholder="Digite sua senha")
                 confirm_password_cadastro = st.text_input("Confirmar Senha", type="password", placeholder="Confirme sua senha")
+                saram_cadastro = st.text_input("SARAM", placeholder="Digite seu SARAM, sem espaços ou traços")
                 confirm_saram_cadastro = st.text_input("Confirmar SARAM", placeholder="Confirme seu SARAM, sem espaços ou traços")
 
             # pega o posto atual da session_state (atualizado pelo selectbox) para definir as opções de função
@@ -184,15 +187,16 @@ if not st.session_state.logado: # Se o usuário não estiver logado, exibe a ár
             #enviar cadastro
             submit_cadastro = st.form_submit_button("Cadastrar")
             if submit_cadastro:
-                if validar_cadastro(name=username_cadastro, email=email_cadastro, password=password_cadastro, confirm_password=confirm_password_cadastro, saram=saram_cadastro, confirm_saram=confirm_saram_cadastro, funcao=funcao_cadastro, confirm_funcao=funcao_cadastro, posto_graduacao=posto_atual, secao=secao_cadastro):
+                if validar_cadastro(name=username_cadastro, email=email_cadastro, password=password_cadastro, confirm_password=confirm_password_cadastro, saram=saram_cadastro, confirm_saram=confirm_saram_cadastro, funcao=funcao_cadastro, confirm_funcao=funcao_cadastro, posto_graduacao=posto_atual, secao=secao_cadastro, nome_guerra=warname_cadastro):
                     st.success("Cadastro realizado com sucesso!")
                     st.session_state.dados_militar = {
                         "nome": username_cadastro,
                         "saram": saram_cadastro,
                         "email": email_cadastro,
                         "funcao": funcao_cadastro,
-                        "posto_graduacao": posto_atual,
-                        "secao": secao_cadastro
+                        "posto": posto_atual,
+                        "secao": secao_cadastro,
+                        "nome_guerra": warname_cadastro
                     }
                     st.session_state.logado = True # Define o estado de logado como True após cadastro bem-sucedido
                     st.session_state["reset_posto_graduacao"] = True

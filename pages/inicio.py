@@ -7,15 +7,32 @@ st.set_page_config(
     layout='centered'
 )
 
-# verificando se o militar está logado e dando boas vindas
+# verificando se o militar está logado e dando boas vindas e se é a primeira vez que acessa
 if 'logado' not in st.session_state:
     st.session_state['logado'] = False
     st.switch_page("pages/login.py")
-elif st.session_state.logado:
-    dados_militar = st.session_state.dados_militar
-    st.sidebar.markdown(f"### 👤 {dados_militar['nome']}")
-    st.toast(f'Bem-vindo, Sr. {dados_militar['posto']}{dados_militar['nome']}!')
 
+elif st.session_state.logado:
+    if 'first_visit' not in st.session_state:
+        st.session_state.first_visit = True
+        dados_militar = st.session_state.dados_militar
+        st.toast(f'Bem-vindo, Sr. {dados_militar['posto']} {dados_militar['nome_guerra']}!')
+
+        st.session_state.first_visit = False # Garante que a mensagem de boas-vindas seja exibida apenas na primeira visita
+
+## Exibe o nome do militar no sidebar
+with st.sidebar:
+    
+    st.title(f"🪖 Bem-vindo, {st.session_state.dados_militar['posto']} {st.session_state.dados_militar['nome_guerra']}.")
+    if st.button("Sair", type='primary', use_container_width=True):
+        st.session_state.logado = False
+        st.session_state.dados_militar = None
+        st.session_state.first_visit = None
+        st.switch_page("pages/login.py")
+
+# =========================================================================
+# Conteúdo da página inicial
+# =========================================================================
 st.title("✈️ Bem-vindo ao Sistema de Apoio ao SAU da BACG 🛠️")
 st.markdown("""
 Esta ferramenta foi desenvolvida para otimizar o fluxo de gerenciamento de Ordens de Serviço do EIE da BACG.
@@ -24,7 +41,7 @@ Esta ferramenta foi desenvolvida para otimizar o fluxo de gerenciamento de Orden
             
 - Carregue a base de dados atualizada, no formato '.xls', a mesma pode ser exportada na lista de chamados do sistema SAU.
             
-```© 2026 Sgt Wesley Souza. Todos os direitos reservados. | Sistema de Apoio ao SAU 🇧🇷```         
+```© 2026 Sgt LINK. Todos os direitos reservados. | Sistema de Apoio ao SAU 🇧🇷```         
 """)
 # CRIAR UM UPLOADER DE ARQUIVOS
 
