@@ -5,11 +5,11 @@
 import hashlib
 
 # função para hash de senha usando SHA-256
-def hash_password(password):
+def hash_password(password) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 # função para validar o login do usuário, verificando o SARAM e a senha fornecidos
-def validar_login(saram, password_hashed, supabase_client, table_name):
+def validar_login(saram, password_hashed, supabase_client, table_name) -> bool | dict:
     # consultar o banco de dados para verificar se o SARAM existe e a senha corresponde
     try:
         if not saram or not password_hashed:
@@ -24,7 +24,7 @@ def validar_login(saram, password_hashed, supabase_client, table_name):
         return False
 
 # função para validar o cadastro
-def validar_cadastro(user_data):
+def validar_cadastro(user_data) -> tuple[bool, str | dict]:
     # extrair os dados do formulário
     name = user_data.get("name")
     email = user_data.get("email")

@@ -8,6 +8,7 @@ from utils.security import hash_password # função de hash de senha para segura
 from utils.security import validar_cadastro # função de validação de cadastro (definida em utils/security.py)
 from utils.security import validar_login # função de validação de login (definida em utils/security.py)
 from utils.database_function import insert_new_user # função para inserir um novo usuário no banco de dados (definida em utils/database_function.py)
+from utils.router import login_redirect # função de roteamento para redirecionar para a página correta após o login (definida em utils/router.py)
 
 
 # verificando se foi estabelecida a conexão com o supabase (definida em app.py) e armazena no session_state.supabase para uso global
@@ -58,8 +59,9 @@ if not st.session_state.logado: # Se o usuário não estiver logado, exibe a ár
                 if user_logged: # Se o login for bem-sucedido, user_logged conterá os dados do militar
                     st.session_state.dados_militar = user_logged # Armazena os dados do militar no session_state para uso global
                     st.session_state.logado = True # Define o estado de logado como True
-                    st.toast("Login automático realizado após cadastro bem-sucedido. Redirecionando para a página inicial...")
-                    st.switch_page("pages/inicio.py") # Redireciona para a página inicial após login bem-sucedido
+                    st.toast("Login realizado com sucesso! Redirecionando...") # Exibe uma mensagem de sucesso
+                    login_redirect() # Chama a função de roteamento para redirecionar para a página correta após o login
+
                 else: # se retornar false, mostra mensagem de erro
                     st.error("SARAM ou senha incorretos. Por favor, tente novamente.")
     #trabalhando na aba de cadastro
@@ -166,19 +168,14 @@ if not st.session_state.logado: # Se o usuário não estiver logado, exibe a ár
                     elif insert_response.get("id"):
                         st.success("Cadastro realizado com sucesso!")
                         st.session_state.dados_militar = insert_response # armazena os dados do militar recém-cadastrado no session_state para uso global (incluindo o ID gerado pelo banco de dados e o created_at)
-                        st.session_state.logado = True # Define o estado de logado como True após cadastro bem-sucedido
                         st.session_state["reset_posto_graduacao"] = True
-                        st.switch_page('pages/inicio.py') # Redireciona para a página inicial após cadastro bem-sucedido
+                        st.session_state.logado = True # Define o estado de logado como True após cadastro bem-sucedido
+                        login_redirect() # Chama a função de roteamento para redirecionar para a página correta com base na função do usuário após o cadastro bem-sucedido
+                        
+                        
 
                 else: # se ocorreu algum erro de validação, exibe a mensagem de erro retornada pela função validar_cadastro
                     st.error(validate_register[1])
                     st.session_state.clear() # Limpa o session_state para evitar dados inconsistentes após erro de cadastro
                     sleep(4) # Aguarda 4 segundos antes de reiniciar
                     st.rerun() # Rerun para resetar os campos e o estado da página após erro de cadastro
-
-
-# =========================================================
-# SE O USUÁRIO ESTIVER LOGADO, EXIBE A PÁGINA INICIAL (REDIRECIONA PARA OUTRA PÁGINA)
-# =========================================================
-if st.session_state.logado: # Se o usuário estiver logado, exibe a página inicial
-    st.switch_page("pages/inicio.py")
