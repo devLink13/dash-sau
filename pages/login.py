@@ -4,10 +4,10 @@ from supabase import create_client, Client
 from time import sleep
 
 # importações de módulos próprios
-from components.security import hash_password # função de hash de senha para segurança (definida em components/security.py)
-from components.security import validar_cadastro # função de validação de cadastro (definida em components/security.py)
-from components.security import validar_login # função de validação de login (definida em components/security.py)
-from components.database_function import insert_new_user # função para inserir um novo usuário no banco de dados (definida em components/database_function.py)
+from utils.security import hash_password # função de hash de senha para segurança (definida em utils/security.py)
+from utils.security import validar_cadastro # função de validação de cadastro (definida em utils/security.py)
+from utils.security import validar_login # função de validação de login (definida em utils/security.py)
+from utils.database_function import insert_new_user # função para inserir um novo usuário no banco de dados (definida em utils/database_function.py)
 
 
 # verificando se foi estabelecida a conexão com o supabase (definida em app.py) e armazena no session_state.supabase para uso global
