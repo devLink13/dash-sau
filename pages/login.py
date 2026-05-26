@@ -1,74 +1,20 @@
 # importações
 import streamlit as st
 from supabase import create_client, Client
-import hashlib
 from time import sleep
+
+# importações de módulos próprios
+from components.security import hash_password # função de hash de senha para segurança (definida em components/security.py)
+from components.security import validar_cadastro # função de validação de cadastro (definida em components/security.py)
+from components.security import validar_login # função de validação de login (definida em components/security.py)
+from components.database_function import insert_new_user # função para inserir um novo usuário no banco de dados (definida em components/database_function.py)
+
 
 # verificando se foi estabelecida a conexão com o supabase (definida em app.py) e armazena no session_state.supabase para uso global
 if not 'supabase' in st.session_state:
     st.error("Erro: Conexão com o banco de dados não estabelecida. Por favor, verifique as configurações do Supabase.")
 elif 'supabase' in st.session_state:
     supabase = st.session_state.supabase # Acessa o cliente do Supabase armazenado no session_state
-
-
-## função para hash de senha
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-## funções da página
-# funções de validação do código
-def validar_login(saram, password):
-    # consultar o banco de dados para verificar se o SARAM existe e a senha corresponde
-    try:
-        if not saram or not password:
-            return False
-        senha_hashed = hash_password(password) # hash da senha fornecida para comparação
-        query = supabase.table("usuarios").select("*").eq("saram", saram).execute()
-        if query.data and query.data[0]['senha_hash'] == senha_hashed: 
-            st.session_state.dados_militar = query.data[0] # Armazena os dados do militar no session_state
-            st.session_state.logado = True # Define o estado de logado como True
-            return True
-
-    except:
-        return False
-
-
-def validar_cadastro(name, email, password, confirm_password, saram, confirm_saram, funcao, confirm_funcao, posto_graduacao, secao, nome_guerra):
-    ## vericações básicas de cadastro, como campos preenchidos e correspondência de senha/SARAM
-    if not all([name, email, password, confirm_password, saram, confirm_saram, funcao, confirm_funcao, posto_graduacao]): # Verificação de campos vazios
-        st.error("Por favor, preencha todos os campos.")
-        return False
-    if password != confirm_password: # Verificação de senha
-        st.error("As senhas não coincidem.")
-        return False
-    if saram != confirm_saram: # Verificação de SARAM
-        st.error("Os SARAMs não coincidem.")
-        return False
-    if len(saram) != 7 or not saram.isnumeric(): # 7440820 
-        st.error("O SARAM deve conter exatamente 7 dígitos numéricos.")
-        return False
-    
-    else: # se passou nas validações
-        dados_militar = {
-            "nome": name,
-            "saram": saram,
-            "email": email,
-            "senha_hash": hash_password(password=password), # Armazena a senha como hash para segurança
-            "funcao": funcao,
-            "posto": posto_graduacao,
-            "secao": secao,
-            "nome_guerra": nome_guerra
-        }
-
-        #gravar os dados no banco de dados (tabela "usuarios")
-        try:
-            supabase.table("usuarios").insert(dados_militar).execute()
-        except:
-            return False
-
-
-    # se der tudo certo, retorna true para indicar cadastro bem-sucedido
-    return True
 
 
 ##### INICIO DAS CONFIGURAÇÕES E LAYOUT DA PÁGINA #####
@@ -106,7 +52,12 @@ if not st.session_state.logado: # Se o usuário não estiver logado, exibe a ár
             submit_login = st.form_submit_button("Entrar")
 
             if submit_login:
-                if validar_login(saram, password): # se retornar true, o login é bem-sucedido
+                password_hashed = hash_password(password) # Hash da senha fornecida para comparação
+
+                user_logged = validar_login(saram, password_hashed, supabase, "usuarios") # Chama a função de validação de login e armazena o resultado (dados do militar se válido, ou False se inválido)
+                if user_logged: # Se o login for bem-sucedido, user_logged conterá os dados do militar
+                    st.session_state.dados_militar = user_logged # Armazena os dados do militar no session_state para uso global
+                    st.session_state.logado = True # Define o estado de logado como True
                     st.toast("Login automático realizado após cadastro bem-sucedido. Redirecionando para a página inicial...")
                     st.switch_page("pages/inicio.py") # Redireciona para a página inicial após login bem-sucedido
                 else: # se retornar false, mostra mensagem de erro
@@ -187,23 +138,40 @@ if not st.session_state.logado: # Se o usuário não estiver logado, exibe a ár
             #enviar cadastro
             submit_cadastro = st.form_submit_button("Cadastrar")
             if submit_cadastro:
-                if validar_cadastro(name=username_cadastro, email=email_cadastro, password=password_cadastro, confirm_password=confirm_password_cadastro, saram=saram_cadastro, confirm_saram=confirm_saram_cadastro, funcao=funcao_cadastro, confirm_funcao=funcao_cadastro, posto_graduacao=posto_atual, secao=secao_cadastro, nome_guerra=warname_cadastro):
-                    st.success("Cadastro realizado com sucesso!")
-                    st.session_state.dados_militar = {
-                        "nome": username_cadastro,
-                        "saram": saram_cadastro,
-                        "email": email_cadastro,
-                        "funcao": funcao_cadastro,
-                        "posto": posto_atual,
-                        "secao": secao_cadastro,
-                        "nome_guerra": warname_cadastro
-                    }
-                    st.session_state.logado = True # Define o estado de logado como True após cadastro bem-sucedido
-                    st.session_state["reset_posto_graduacao"] = True
-                    st.switch_page('pages/inicio.py') # Redireciona para a página inicial após cadastro bem-sucedido
+                user_data = {
+                    "name": username_cadastro,
+                    "email": email_cadastro,
+                    "password": password_cadastro,
+                    "confirm_password": confirm_password_cadastro,
+                    "saram": saram_cadastro,
+                    "confirm_saram": confirm_saram_cadastro,
+                    "funcao": funcao_cadastro,
+                    "confirm_funcao": funcao_cadastro, # Para simplificar a validação, estamos usando o mesmo valor para função e confirmação de função
+                    "posto_graduacao": posto_atual,
+                    "secao": secao_cadastro,
+                    "nome_guerra": warname_cadastro
+                }
+                validate_register = validar_cadastro(user_data) # Chama a função de validação de cadastro e armazena o resultado que é um dicionário com os dados do militar se o cadastro for válido, ou False se houver algum erro de validação
 
-                else:
-                    st.error("Ocorreu um erro no cadastro. Verifique os dados e tente novamente.")
+                if validate_register[0]: # verifica se o cadastro é válido (primeiro item da tupla retornada pela função validar_cadastro)
+                    dados_militar = validate_register[1] # Extrai os dados do militar do resultado da validação (segundo item da tupla retornada pela função validar_cadastro)
+                    insert_response = insert_new_user(supabase, "usuarios", dados_militar) # Chama a função para inserir o novo usuário no banco de dados e armazena a resposta
+
+                    if not insert_response.get("id"):
+                        st.error("Ocorreu um erro no cadastro. Por favor, tente novamente.")
+                        st.session_state.clear() # Limpa o session_state para evitar dados inconsistentes após erro de cadastro
+                        sleep(4) # Aguarda 4 segundos antes de reiniciar
+                        st.rerun() # Rerun para resetar os campos e o estado da página após erro de cadastro
+
+                    elif insert_response.get("id"):
+                        st.success("Cadastro realizado com sucesso!")
+                        st.session_state.dados_militar = insert_response # armazena os dados do militar recém-cadastrado no session_state para uso global (incluindo o ID gerado pelo banco de dados e o created_at)
+                        st.session_state.logado = True # Define o estado de logado como True após cadastro bem-sucedido
+                        st.session_state["reset_posto_graduacao"] = True
+                        st.switch_page('pages/inicio.py') # Redireciona para a página inicial após cadastro bem-sucedido
+
+                else: # se ocorreu algum erro de validação, exibe a mensagem de erro retornada pela função validar_cadastro
+                    st.error(validate_register[1])
                     st.session_state.clear() # Limpa o session_state para evitar dados inconsistentes após erro de cadastro
                     sleep(4) # Aguarda 4 segundos antes de reiniciar
                     st.rerun() # Rerun para resetar os campos e o estado da página após erro de cadastro
