@@ -1,5 +1,7 @@
 import streamlit as st
 from utils.router import login_redirect
+from time import sleep
+import pandas as pd
 
 # ==========================================================
 # pagina de visão da chefia
@@ -21,27 +23,120 @@ if 'logado' in st.session_state and st.session_state.dados_militar.get("funcao")
     login_redirect() # redireciona para a página de login se não tiver permissão de acesso
     st.stop()  # Interrompe a execução do script
 
+# ==========================================================
+# inicialização do states
+# ==========================================================
+
 # session_state para renderização de conteúdo dinâmico
 if 'current_view' not in st.session_state:
     st.session_state.current_view = None
+
+# criar um state para desabilitar alguns botões da sidebar caso não haja dados inseridos
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
     
 
 # ==========================================================
 # RENDERIZAR CONTEUDO DE ATUALIZAR CHAMADOS
 # ==========================================================
 def renderizar_atualizar_chamados():
-    st.subheader("Atualizar Chamados")
-    st.markdown(
-        """
-        Para atualizar os chamados, siga os passos abaixo:
-        1. Exporte a lista de chamados atualizada do sistema SAU no formato `.xls` ou `.xlsx`.
-        2. Clique no botão "Carregar arquivo de dados" e selecione o arquivo exportado.
-        3. Aguarde a mensagem de sucesso indicando que o arquivo foi carregado corretamente.
+    
+
+    top_container = st.container(border=True)
+    with top_container:
+        st.subheader("Atualizar Chamados ou Inserir chamados no Sistema", text_alignment='center')
+        st.markdown("---")  # linha divisória
+        st.markdown(
+            """
+            Para atualizar os chamados, siga os passos abaixo:
+            1. Exporte a lista de chamados atualizada do sistema SAU no formato `.xls` ou `.xlsx`.
+            2. Clique no botão "Carregar Planilha de Chamados" e selecione o arquivo exportado.
+            3. Aguarde a mensagem de sucesso indicando que o arquivo foi carregado corretamente.
+            
+            **Observação:** Certifique-se de que o arquivo esteja formatado corretamente para garantir que os dados sejam processados sem erros.
+            """,
+            unsafe_allow_html=True,
+        )
+    
+    main_container = st.container(border=False)
+    with main_container:
+        # dividir o container em duas colunas (30% e 70%)
+        col_esquerda, col_direita = st.columns([3, 7])
+
+        with col_esquerda:
+            # =============================
+            # container de upload de arquivo
+            # =============================
+            with st.container(border=True):
+                st.markdown("### Carregar Planilha de Chamados")
+                st.markdown('---')
+
+                uploaded_file = st.file_uploader("Selecione o arquivo de dados (.xlsx ou .csv)", type=["xls", "xlsx", "csv"])
+                if uploaded_file is not None:
+                    with st.spinner(f"Processando o arquivo {uploaded_file.name}..."):
+                        sleep(2)  # Simula um tempo de processamento
+
+                        df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith(('.xls', '.xlsx')) else pd.read_csv(uploaded_file)
+
+
+                        
+                    st.toast(f"Arquivo {uploaded_file.name} carregado com sucesso!", icon="✅")
+
+            # =============================
+            # container que exibe insights prévios para conferência de dados integros
+            # =============================
+            with st.container(border=True):
+                if uploaded_file is not None:
+                    # marca que temos dados carregados (habilita botões da sidebar)
+                    st.session_state.data_loaded = True
+
+                    st.markdown("### Insights Rápidos")
+                    # infos básicas
+                    n_rows, n_cols = df.shape
+                    n_duplicados = int(df.duplicated().sum())
+                    
+                    # métricas
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("qtd chamados", f"{n_rows:,}")
+                    c2.metric("Colunas (padrão é 16)", f"{n_cols:,}")
+                    c3.metric("Duplicados", f"{n_duplicados:,}")
+
+                    
+                    st.markdown("---")
+
+                    # colunas com mais valores ausentes (top 10)
+                    with st.expander("Colunas com mais valores ausentes"):
+                        miss_by_col = df.isna().sum().sort_values(ascending=False)
+                        st.bar_chart(miss_by_col.head(10))
+
+                    # escolher uma coluna para inspeção rápida
+                    cols = list(df.columns)
+                    sel_col = st.selectbox("Selecionar coluna para inspeção rápida", options=cols)
+
+                    if sel_col:
+                        col_info, col_vals = st.columns([1, 2])
+                        with col_info:
+                            st.write("Nulos:", int(df[sel_col].isna().sum()))
+                            st.write("Únicos:", int(df[sel_col].nunique(dropna=True)))
+                        with col_vals:
+                            st.write("Top valores")
+                            st.table(df[sel_col].value_counts(dropna=True).head(6))
+
+                else:
+                    st.info("Nenhum arquivo carregado — faça o upload para ver insights aqui.")
+                
+        with col_direita:
+            with st.container(border=True):
+                st.markdown("### Pré-visualização dos Dados")
+                st.markdown('---')
+
+                if uploaded_file is not None:
+                    st.table(df.head(2))  # Exibe as primeiras 10 linhas do DataFrame como pré-visualização
+                else:
+                    st.warning("Nenhum arquivo carregado. Carregue um arquivo para visualizar os dados aqui.")
+
+
         
-        **Observação:** Certifique-se de que o arquivo esteja formatado corretamente para garantir que os dados sejam processados sem erros.
-        """,
-        unsafe_allow_html=True,
-    )
 
 # ==========================================================
 # RENDERIZAR CONTEUDO DE DETALHAMENTO DE CHAMADOS
@@ -73,7 +168,6 @@ def renderizar_detalhamento_chamados():
             
         with col2:
             st.subheader("Gráfico de OS's Concluídas por Oficinas")
-
 
 # =========================================================
 # RENDERIZAR CONTEÚDO DE CONFIGURAÇÕES
@@ -121,6 +215,23 @@ def renderizar_despacho_chamados():
         unsafe_allow_html=True,
     )
 
+
+# ==========================================================
+# RENDERIZAR CONTEÚDO PADRÃO DE BOAS VINDAS
+# ==========================================================
+def renderizar_conteudo_padrao():
+    
+    st.title("✈️ Bem-vindo ao Sistema de Apoio ao SAU da BACG 🛠️")
+    st.markdown("""
+        Esta ferramenta foi desenvolvida para otimizar o fluxo de gerenciamento de Ordens de Serviço do EIE da BACG.
+        - Utilize o menu lateral para alternar entre as visões estratégicas e operacionais.
+        - Certifique-se de atualizar o arquivo `.xls` exportado diretamente do sistema de chamados SAU para garantir que os dados estejam sempre atuais.
+                    
+        - Carregue a base de dados atualizada, no formato '.xls', a mesma pode ser exportada na lista de chamados do sistema SAU.
+        ```© 2026 Sgt LINK. Todos os direitos reservados. | Sistema de Apoio ao SAU 🇧🇷```
+    """, unsafe_allow_html=True)
+
+
 # ==========================================================
 # RENDERIZAR A BARRA LATERAL COM AVATAR E NOME DO USUÁRIO
 # ==========================================================
@@ -160,17 +271,18 @@ with st.sidebar:
     )
     st.sidebar.markdown("---")  # linha divisória
 
-    
+    st.sidebar.button("Atualizar/Inserir Chamados", use_container_width=True, on_click=lambda: setattr(st.session_state, 'current_view', 'atualizar_chamados'))
+
     st.sidebar.button("Despachar Chamados para Oficinas", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'despacho_chamados'))
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'despacho_chamados'), disabled = True if not st.session_state.data_loaded else False)
     st.sidebar.button("Detalhamento de Chamados", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'detalhamento_chamados'))
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'detalhamento_chamados'), disabled = True if not st.session_state.data_loaded else False)
     st.sidebar.button("Gerar Relatório", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'relatorios'))
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'relatorios'), disabled = True if not st.session_state.data_loaded else False)
     st.sidebar.button("Configurações", use_container_width=True, 
                       on_click=lambda: setattr(st.session_state, 'current_view', 'configuracoes'))
 
-    st.sidebar.button("Atualizar Chamados", use_container_width=True, on_click=lambda: setattr(st.session_state, 'current_view', 'atualizar_chamados'))
+    
     st.markdown(
         "<div style='text-align: right; color: red;'>"
         "última atualização do banco de dados em: 26/02/2024 14:30"
@@ -181,20 +293,6 @@ with st.sidebar:
 
     st.sidebar.button("Sair", use_container_width=True, type="primary", on_click= lambda: setattr(st.session_state, 'logado', False))
 
-# ==========================================================
-# RENDERIZAR CONTEÚDO PADRÃO DE BOAS VINDAS
-# ==========================================================
-def renderizar_conteudo_padrao():
-    
-    st.title("✈️ Bem-vindo ao Sistema de Apoio ao SAU da BACG 🛠️")
-    st.markdown("""
-        Esta ferramenta foi desenvolvida para otimizar o fluxo de gerenciamento de Ordens de Serviço do EIE da BACG.
-        - Utilize o menu lateral para alternar entre as visões estratégicas e operacionais.
-        - Certifique-se de atualizar o arquivo `.xls` exportado diretamente do sistema de chamados SAU para garantir que os dados estejam sempre atuais.
-                    
-        - Carregue a base de dados atualizada, no formato '.xls', a mesma pode ser exportada na lista de chamados do sistema SAU.
-        ```© 2026 Sgt LINK. Todos os direitos reservados. | Sistema de Apoio ao SAU 🇧🇷```
-    """, unsafe_allow_html=True)
 
 
 # ==========================================================
@@ -210,3 +308,5 @@ elif st.session_state.current_view == "relatorios":
     renderizar_relatorios()
 elif st.session_state.current_view == "despacho_chamados":
     renderizar_despacho_chamados()
+elif st.session_state.current_view == "atualizar_chamados":
+    renderizar_atualizar_chamados()
