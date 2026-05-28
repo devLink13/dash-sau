@@ -85,8 +85,9 @@ def renderizar_atualizar_chamados():
             # =============================
             # container que exibe insights prévios para conferência de dados integros
             # =============================
-            with st.container(border=True):
-                if uploaded_file is not None:
+            if uploaded_file is not None: # só exibe se temos um arquivo carregado
+                with st.container(border=True):
+                    
                     # marca que temos dados carregados (habilita botões da sidebar)
                     st.session_state.data_loaded = True
 
@@ -101,7 +102,6 @@ def renderizar_atualizar_chamados():
                     c2.metric("Colunas (padrão é 16)", f"{n_cols:,}")
                     c3.metric("Duplicados", f"{n_duplicados:,}")
 
-                    
                     st.markdown("---")
 
                     # colunas com mais valores ausentes (top 10)
@@ -122,18 +122,17 @@ def renderizar_atualizar_chamados():
                             st.write("Top valores")
                             st.table(df[sel_col].value_counts(dropna=True).head(6))
 
-                else:
-                    st.info("Nenhum arquivo carregado — faça o upload para ver insights aqui.")
                 
         with col_direita:
-            with st.container(border=True):
-                st.markdown("### Pré-visualização dos Dados")
-                st.markdown('---')
+            if uploaded_file is not None: # só exibe se temos um arquivo carregado
+                with st.container(border=True):
+                    st.markdown("### Pré-visualização dos Dados")
+                    st.markdown('---')
 
-                if uploaded_file is not None:
-                    st.table(df.head(2))  # Exibe as primeiras 10 linhas do DataFrame como pré-visualização
-                else:
-                    st.warning("Nenhum arquivo carregado. Carregue um arquivo para visualizar os dados aqui.")
+                    if uploaded_file is not None:
+                        st.table(df.head(2))  # Exibe as primeiras 10 linhas do DataFrame como pré-visualização
+                    else:
+                        st.warning("Nenhum arquivo carregado. Carregue um arquivo para visualizar os dados aqui.")
 
 
         
