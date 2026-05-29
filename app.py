@@ -25,13 +25,6 @@ pagina_login = st.Page(
 )
 
 
-pagina_inicio = st.Page(
-    "pages/inicio.py",
-    title="Página Inicial",
-    icon="🏠",
-    default=False # Não abre esta página por padrão, pois queremos que o login seja a primeira tela que o usuário veja.
-)
-
 pagina_gerencial = st.Page(
     "pages/painel_gerencial.py",
     title="Página Gerencial",
@@ -39,12 +32,6 @@ pagina_gerencial = st.Page(
     default=False # Não abre esta página por padrão, pois queremos que o login seja a primeira tela que o usuário veja.
 )
 
-pagina_operacional = st.Page(
-    "pages/lista_operacional.py",
-    title="Página Operacional",
-    icon="⚙️",
-    default=False # Não abre esta página por padrão, pois queremos que o login seja a primeira tela que o usuário veja.
-)
 
 pagina_visao_comandante = st.Page(
     "pages/visao_comandante.py",
@@ -76,7 +63,7 @@ pagina_visao_tecnico = st.Page(
 
 # 3. Criamos a navegação, mas ESCONDEMOS a barra lateral com position="hidden"
 navegacao = st.navigation(
-    [pagina_login, pagina_inicio, pagina_gerencial, pagina_operacional, pagina_visao_comandante, pagina_visao_chefia, pagina_visao_encarregado, pagina_visao_tecnico], 
+    [pagina_login, pagina_gerencial, pagina_visao_comandante, pagina_visao_chefia, pagina_visao_encarregado, pagina_visao_tecnico], 
     position="hidden" # <--- Esta linha esconde o menu lateral cinza do Streamlit
 )
 

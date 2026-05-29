@@ -1,7 +1,11 @@
 import streamlit as st
-from utils.router import login_redirect
 from time import sleep
 import pandas as pd
+
+# modulos próprios
+from utils.router import login_redirect
+from utils.database_function import check_data_freshness
+
 
 # ==========================================================
 # pagina de visão da chefia
@@ -14,7 +18,6 @@ st.set_page_config(layout="wide")
 # verificações de login
 # ==========================================================
 if 'logado' not in st.session_state or st.session_state.logado == False:
-    st.session_state.clear() # limpa o session_state para evitar dados residuais
     login_redirect() # redireciona para a página de login se não estiver logado
     st.stop()  # Interrompe a execução do script
 
@@ -22,6 +25,15 @@ if 'logado' not in st.session_state or st.session_state.logado == False:
 if 'logado' in st.session_state and st.session_state.dados_militar.get("funcao") not in ['Chefia', 'Direção', 'Outra']:
     login_redirect() # redireciona para a página de login se não tiver permissão de acesso
     st.stop()  # Interrompe a execução do script
+
+
+# ======================================================================
+# verificações de  integridade / atualização dos dados (trava de 7 dias)
+# ======================================================================
+is_fresh, last_dt = check_data_freshness(st.session_state.supabase, "usuarios", days = 7)
+st.session_state.data_outed = not is_fresh  # se os dados não forem fresh, ativa a trava de dados desatualizados (data_outed = dados desatualizados)
+
+
 
 # ==========================================================
 # inicialização do states
@@ -34,7 +46,10 @@ if 'current_view' not in st.session_state:
 # criar um state para desabilitar alguns botões da sidebar caso não haja dados inseridos
 if 'data_loaded' not in st.session_state:
     st.session_state.data_loaded = False
-    
+
+# session_state para checkbox de confirmação de atualização dos dados
+if 'confirm_checkbox' not in st.session_state:
+    st.session_state.confirm_checkbox = False
 
 # ==========================================================
 # RENDERIZAR CONTEUDO DE ATUALIZAR CHAMADOS
@@ -73,14 +88,23 @@ def renderizar_atualizar_chamados():
 
                 uploaded_file = st.file_uploader("Selecione o arquivo de dados (.xlsx ou .csv)", type=["xls", "xlsx", "csv"])
                 if uploaded_file is not None:
-                    with st.spinner(f"Processando o arquivo {uploaded_file.name}..."):
-                        sleep(2)  # Simula um tempo de processamento
+                    # criar um id unico para o arquivo carregado (baseado no nome e tamanho do arquivo, evitando o timestamp para garantir que o id não mude se o usuário carregar o mesmo arquivo por engano)
+                    file_id = f"{uploaded_file.name}_{uploaded_file.size}"
 
+                    # só processa e mostra o toast se for um arquivo novo (evita processar novamente se o usuário carregar o mesmo arquivo por engano)
+                    if st.session_state.get('last_processed_file') != file_id:
+                        with st.spinner(f"Processando o arquivo {uploaded_file.name}..."):
+                            sleep(2)  # Simula um tempo de processamento
+
+                            df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith(('.xls', '.xlsx')) else pd.read_csv(uploaded_file)
+                            
+                            # atribuir o last_processed_file para evitar reprocessamento do mesmo arquivo
+                            st.session_state.last_processed_file = file_id
+                            
+                            st.toast(f"Arquivo {uploaded_file.name} carregado com sucesso!", icon="✅")
+
+                    else:
                         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith(('.xls', '.xlsx')) else pd.read_csv(uploaded_file)
-
-
-                        
-                    st.toast(f"Arquivo {uploaded_file.name} carregado com sucesso!", icon="✅")
 
             # =============================
             # container que exibe insights prévios para conferência de dados integros
@@ -88,9 +112,6 @@ def renderizar_atualizar_chamados():
             if uploaded_file is not None: # só exibe se temos um arquivo carregado
                 with st.container(border=True):
                     
-                    # marca que temos dados carregados (habilita botões da sidebar)
-                    st.session_state.data_loaded = True
-
                     st.markdown("### Insights Rápidos")
                     # infos básicas
                     n_rows, n_cols = df.shape
@@ -125,6 +146,10 @@ def renderizar_atualizar_chamados():
                 
         with col_direita:
             if uploaded_file is not None: # só exibe se temos um arquivo carregado
+
+                # ============================================
+                # container de pré-visualização dos dados
+                # ============================================
                 with st.container(border=True):
                     st.markdown("### Pré-visualização dos Dados")
                     st.markdown('---')
@@ -134,8 +159,48 @@ def renderizar_atualizar_chamados():
                     else:
                         st.warning("Nenhum arquivo carregado. Carregue um arquivo para visualizar os dados aqui.")
 
+                # ============================================
+                # container de confirmação de atualização dos dados
+                # ============================================
+                with st.container(border=True):
+                    '''
+                        FEATURE FUTURA IMPORTANTE PARA IMPLEMENTAR: adicionar uma função de pré-validação dos dados para verificar se o arquivo carregado tem as colunas esperadas (ex: Nº, Ab., Status, Objeto, etc) e se os tipos de dados estão corretos (ex: coluna de data tem formato de data, coluna de número tem formato numérico, etc). Se a validação falhar, exibir um alerta para o usuário indicando quais problemas foram encontrados no arquivo e impedir a atualização dos dados até que o arquivo seja corrigido. Isso ajudará a garantir a integridade dos dados no sistema e evitar erros futuros causados por arquivos mal formatados.
+                    '''
 
-        
+                    st.markdown("### Confirmar Atualização dos Dados")
+                    st.warning("Revise os detalhes do arquivo carregado antes de confirmar a atualização do sistema. Esteja ciente de que as informações do arquivo devem estar corretas para garantir a integridade dos dados no sistema.")
+                    st.markdown('---')
+                    with st.expander("Detalhes do Arquivo"):
+                        st.write(f'Nome do arquivo: ```{uploaded_file.name.split(".")[0]}```')
+                        st.write(f'Extensão do arquivo: ```.{uploaded_file.name.split(".")[-1]}```')
+                        st.write(f'Tamanho do arquivo: ```{uploaded_file.size / 1024:.2f} KB```')
+                        st.write(f'Data de upload: ```{pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")}```')
+                        st.write(f'Número de linhas: ```{n_rows:,}```')
+                        st.write(f'Número de colunas: ```{n_cols:,}```')
+                    st.checkbox("Confirmo que os dados estão corretos e desejo atualizar o sistema com este arquivo", key= "confirm_checkbox")
+                    button_confirmar = st.button("Confirmar Atualização dos Dados", type="primary", disabled=not st.session_state.confirm_checkbox)
+
+                    if button_confirmar:
+                        '''
+                            FEATURE FUTURA IMPORTANTE PARA IMPLEMENTAR: adicionar uma função para processar o dataframe carregado usando uma outra thread para evitar que a interface trave durante o processamento dos dados, especialmente se o arquivo for grande. Durante o processamento, exibir um spinner ou barra de progresso para informar o usuário sobre o andamento da atualização dos dados. Esperar a resposta do processamento e então chamar um função para escrever esse dataframe filtrado no banco de dados do sistema (supabase), essa função retornando true ou false dependendo do sucesso da operação. Se a atualização for bem sucedida, exibir uma mensagem de sucesso e atualizar o state para habilitar os outros botões da sidebar e redirecionar para a visão de detalhamento de chamados. Se a atualização falhar, exibir uma mensagem de erro indicando que houve um problema ao atualizar os dados e sugerindo tentar novamente ou verificar o formato do arquivo.
+
+                            ESQUEMA:
+                            1. usuário carrega o arquivo e confirma a atualização dos dados
+                            2. exibe um spinner indicando que os dados estão sendo processados
+                            3. def processar_dados(df) -> df or false : função que processa o dataframe (limpeza, transformação, etc) e retorna o dataframe pronto para ser inserido no banco de dados ou false se houver algum erro durante o processamento
+                            4. def atualizar_banco_dados(df) -> bool: função que recebe o dataframe processado e escreve no banco de dados (supabase), retornando true se a operação for bem sucedida ou false se houver algum erro durante a escrita no banco de dados
+                            5. se processar_dados ou atualizar_banco_dados retornar false, exibir uma mensagem de erro indicando que houve um problema ao atualizar os dados e sugerindo tentar novamente ou verificar o formato do arquivo.
+
+                            user_data -> upload_file -> spinner de processamento -> processar_dados(df) [retorna df ou false] -> se retornar df -> atualizar_banco_dados(df) -> se retornar true -> exibir mensagem de sucesso, atualizar state e redirecionar para visão de detalhamento de chamados;
+
+                        '''
+                        st.success("Dados atualizados com sucesso! O sistema agora está atualizado com as informações do arquivo carregado.")
+                        st.session_state.data_loaded = True  # habilita os outros botões da sidebar
+                        st.success("Dados atualizados com sucesso! O sistema agora está atualizado com as informações do arquivo carregado.")
+                        st.session_state.data_loaded = True  # habilita os outros botões da sidebar
+                        st.session_state.current_view = "detalhamento_chamados"  # redireciona para a visão de detalhamento de chamados após a atualização dos dados
+                        st.rerun() # força a rerenderização da página para refletir as mudanças no state
+
 
 # ==========================================================
 # RENDERIZAR CONTEUDO DE DETALHAMENTO DE CHAMADOS
@@ -271,25 +336,20 @@ with st.sidebar:
     st.sidebar.markdown("---")  # linha divisória
 
     st.sidebar.button("Atualizar/Inserir Chamados", use_container_width=True, on_click=lambda: setattr(st.session_state, 'current_view', 'atualizar_chamados'))
+    
+    st.sidebar.button("Detalhamento de Chamados", use_container_width=True, 
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'detalhamento_chamados'), disabled = st.session_state.get('data_loaded', False)) # permitirei acessar os detalhes dos chamados apenas se os dados estiverem carregados para evitar erros de renderização por falta de dados, mas não impedirei de visualizar os dados de desempenho e insights mesmo que desatualizados para não bloquear completamente o acesso à visão da chefia, já que esses dados são menos sensíveis à atualização frequente do que os dados operacionais dos chamados
 
     st.sidebar.button("Despachar Chamados para Oficinas", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'despacho_chamados'), disabled = True if not st.session_state.data_loaded else False)
-    st.sidebar.button("Detalhamento de Chamados", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'detalhamento_chamados'), disabled = True if not st.session_state.data_loaded else False)
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'despacho_chamados'), disabled = st.session_state.get('data)outed', True) or not st.session_state.data_loaded)
+    
+    
     st.sidebar.button("Gerar Relatório", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'relatorios'), disabled = True if not st.session_state.data_loaded else False)
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'relatorios'), disabled = st.session_state.get('data_outed', True) or not st.session_state.data_loaded)
     st.sidebar.button("Configurações", use_container_width=True, 
                       on_click=lambda: setattr(st.session_state, 'current_view', 'configuracoes'))
 
     
-    st.markdown(
-        "<div style='text-align: right; color: red;'>"
-        "última atualização do banco de dados em: 26/02/2024 14:30"
-        "</div>"
-        "<br>",
-        unsafe_allow_html=True,
-    )
-
     st.sidebar.button("Sair", use_container_width=True, type="primary", on_click= lambda: setattr(st.session_state, 'logado', False))
 
 
