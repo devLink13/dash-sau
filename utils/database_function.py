@@ -3,7 +3,7 @@
 # =================================================
 
 # importações necessárias
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # função para inserir um novo usuário no sistema
 def insert_new_user(supabase_client, table_name, user_data):
@@ -36,7 +36,7 @@ def check_data_freshness(supabase_client, table_name, days = 1):
         
         last_update = datetime.fromisoformat(response.data[0]['created_at'].replace("Z", "+00:00")) # converter a string de data para um objeto datetime
 
-        if datetime.now() - last_update > timedelta(days=days):
+        if datetime.now(timezone.utc) - last_update > timedelta(days=days):
             return False, last_update
         
         return True, last_update

@@ -1,10 +1,13 @@
 import streamlit as st
 from time import sleep
 import pandas as pd
+from datetime import datetime, timezone
 
 # modulos próprios
 from utils.router import login_redirect
 from utils.database_function import check_data_freshness
+from utils.chamados_functions import processar_dataframe
+from utils.chamados_functions import pre_processar_dataframe
 
 
 # ==========================================================
@@ -32,7 +35,7 @@ if 'logado' in st.session_state and st.session_state.dados_militar.get("funcao")
 # ======================================================================
 is_fresh, last_dt = check_data_freshness(st.session_state.supabase, "usuarios", days = 7)
 st.session_state.data_outed = not is_fresh  # se os dados não forem fresh, ativa a trava de dados desatualizados (data_outed = dados desatualizados)
-
+st.session_state.last_data_update = last_dt  # armazena a data da última atualização dos dados para exibir na interfac  e e usar em outras lógicas de validação de dados, se necessário
 
 
 # ==========================================================
@@ -55,8 +58,10 @@ if 'confirm_checkbox' not in st.session_state:
 # RENDERIZAR CONTEUDO DE ATUALIZAR CHAMADOS
 # ==========================================================
 def renderizar_atualizar_chamados():
-    
 
+    # ================================================
+    # Container superior
+    # ================================================
     top_container = st.container(border=True)
     with top_container:
         st.subheader("Atualizar Chamados ou Inserir chamados no Sistema", text_alignment='center')
@@ -73,6 +78,9 @@ def renderizar_atualizar_chamados():
             unsafe_allow_html=True,
         )
     
+    #===========================================================
+    # Container principal
+    #===========================================================
     main_container = st.container(border=False)
     with main_container:
         # dividir o container em duas colunas (30% e 70%)
@@ -113,35 +121,33 @@ def renderizar_atualizar_chamados():
                 with st.container(border=True):
                     
                     st.markdown("### Insights Rápidos")
-                    # infos básicas
-                    n_rows, n_cols = df.shape
-                    n_duplicados = int(df.duplicated().sum())
                     
+                    # chama a função de pré-processamento do dataframe para calcular algumas métricas rápidas e ajudar o usuário a identificar possíveis problemas de integridade nos dados antes de confirmar a atualização do sistema
+                    insights = pre_processar_dataframe(df)
+
                     # métricas
                     c1, c2, c3 = st.columns(3)
-                    c1.metric("qtd chamados", f"{n_rows:,}")
-                    c2.metric("Colunas (padrão é 16)", f"{n_cols:,}")
-                    c3.metric("Duplicados", f"{n_duplicados:,}")
+                    c1.metric("qtd chamados", f"{insights['n_rows']:,}")
+                    c2.metric("Colunas (padrão é 16)", f"{insights['n_cols']:,}")
+                    c3.metric("Duplicados", f"{insights['n_duplicados']:,}")
 
                     st.markdown("---")
 
                     # colunas com mais valores ausentes (top 10)
                     with st.expander("Colunas com mais valores ausentes"):
-                        miss_by_col = df.isna().sum().sort_values(ascending=False)
-                        st.bar_chart(miss_by_col.head(10))
+                        st.bar_chart(insights['faltantes_por_coluna'].head(10))
 
                     # escolher uma coluna para inspeção rápida
-                    cols = list(df.columns)
-                    sel_col = st.selectbox("Selecionar coluna para inspeção rápida", options=cols)
+                    sel_col = st.selectbox("Selecionar coluna para inspeção rápida", options=insights['colunas'])
 
                     if sel_col:
                         col_info, col_vals = st.columns([1, 2])
                         with col_info:
-                            st.write("Nulos:", int(df[sel_col].isna().sum()))
-                            st.write("Únicos:", int(df[sel_col].nunique(dropna=True)))
+                            st.write("Nulos:", insights['detalhes_colunas'][sel_col]["nulos"])
+                            st.write("Únicos:", insights['detalhes_colunas'][sel_col]["unicos"])
                         with col_vals:
-                            st.write("Top valores")
-                            st.table(df[sel_col].value_counts(dropna=True).head(6))
+                            st.write("Amostra de valores:")
+                            st.table(insights['detalhes_colunas'][sel_col]["amostra"])
 
                 
         with col_direita:
@@ -163,9 +169,7 @@ def renderizar_atualizar_chamados():
                 # container de confirmação de atualização dos dados
                 # ============================================
                 with st.container(border=True):
-                    '''
-                        FEATURE FUTURA IMPORTANTE PARA IMPLEMENTAR: adicionar uma função de pré-validação dos dados para verificar se o arquivo carregado tem as colunas esperadas (ex: Nº, Ab., Status, Objeto, etc) e se os tipos de dados estão corretos (ex: coluna de data tem formato de data, coluna de número tem formato numérico, etc). Se a validação falhar, exibir um alerta para o usuário indicando quais problemas foram encontrados no arquivo e impedir a atualização dos dados até que o arquivo seja corrigido. Isso ajudará a garantir a integridade dos dados no sistema e evitar erros futuros causados por arquivos mal formatados.
-                    '''
+                   
 
                     st.markdown("### Confirmar Atualização dos Dados")
                     st.warning("Revise os detalhes do arquivo carregado antes de confirmar a atualização do sistema. Esteja ciente de que as informações do arquivo devem estar corretas para garantir a integridade dos dados no sistema.")
@@ -175,8 +179,8 @@ def renderizar_atualizar_chamados():
                         st.write(f'Extensão do arquivo: ```.{uploaded_file.name.split(".")[-1]}```')
                         st.write(f'Tamanho do arquivo: ```{uploaded_file.size / 1024:.2f} KB```')
                         st.write(f'Data de upload: ```{pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S")}```')
-                        st.write(f'Número de linhas: ```{n_rows:,}```')
-                        st.write(f'Número de colunas: ```{n_cols:,}```')
+                        st.write(f'Número de linhas: ```{insights["n_rows"]:,}```')
+                        st.write(f'Número de colunas: ```{insights["n_cols"]:,}```')
                     st.checkbox("Confirmo que os dados estão corretos e desejo atualizar o sistema com este arquivo", key= "confirm_checkbox")
                     button_confirmar = st.button("Confirmar Atualização dos Dados", type="primary", disabled=not st.session_state.confirm_checkbox)
 
@@ -194,8 +198,6 @@ def renderizar_atualizar_chamados():
                             user_data -> upload_file -> spinner de processamento -> processar_dados(df) [retorna df ou false] -> se retornar df -> atualizar_banco_dados(df) -> se retornar true -> exibir mensagem de sucesso, atualizar state e redirecionar para visão de detalhamento de chamados;
 
                         '''
-                        st.success("Dados atualizados com sucesso! O sistema agora está atualizado com as informações do arquivo carregado.")
-                        st.session_state.data_loaded = True  # habilita os outros botões da sidebar
                         st.success("Dados atualizados com sucesso! O sistema agora está atualizado com as informações do arquivo carregado.")
                         st.session_state.data_loaded = True  # habilita os outros botões da sidebar
                         st.session_state.current_view = "detalhamento_chamados"  # redireciona para a visão de detalhamento de chamados após a atualização dos dados
@@ -335,13 +337,21 @@ with st.sidebar:
     )
     st.sidebar.markdown("---")  # linha divisória
 
-    st.sidebar.button("Atualizar/Inserir Chamados", use_container_width=True, on_click=lambda: setattr(st.session_state, 'current_view', 'atualizar_chamados'))
-    
+    if st.session_state.data_outed:
+        # formatar a data para string antes de exibir (verifica se é um objeto de data/timestamp)
+        last_dt = st.session_state.last_data_update
+        dt_formatada = last_dt.strftime("%d/%m/%Y %H:%M") if hasattr(last_dt, 'strftime') else last_dt
+
+        st.sidebar.error(f'Dados desatualizados, última atualização feita em {dt_formatada}, os dados estão desatualizados há {(datetime.now(timezone.utc) - last_dt).days} dias.', icon="⚠️")
+
+    st.sidebar.button("Atualizar/Inserir Chamados", use_container_width=True, on_click=lambda: setattr(st.session_state, 'current_view', 'atualizar_chamados'),
+                      type= "primary" if st.session_state.data_outed else "secondary") # se os dados estiverem desatualizados, destaca o botão de atualizar chamados para incentivar o usuário a atualizar os dados
+
     st.sidebar.button("Detalhamento de Chamados", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'detalhamento_chamados'), disabled = st.session_state.get('data_loaded', False)) # permitirei acessar os detalhes dos chamados apenas se os dados estiverem carregados para evitar erros de renderização por falta de dados, mas não impedirei de visualizar os dados de desempenho e insights mesmo que desatualizados para não bloquear completamente o acesso à visão da chefia, já que esses dados são menos sensíveis à atualização frequente do que os dados operacionais dos chamados
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'detalhamento_chamados'), disabled = not st.session_state.data_loaded)
 
     st.sidebar.button("Despachar Chamados para Oficinas", use_container_width=True, 
-                      on_click=lambda: setattr(st.session_state, 'current_view', 'despacho_chamados'), disabled = st.session_state.get('data)outed', True) or not st.session_state.data_loaded)
+                      on_click=lambda: setattr(st.session_state, 'current_view', 'despacho_chamados'), disabled = st.session_state.get('data_outed', True) or not st.session_state.data_loaded)
     
     
     st.sidebar.button("Gerar Relatório", use_container_width=True, 
